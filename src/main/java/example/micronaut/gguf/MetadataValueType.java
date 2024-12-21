@@ -1,4 +1,4 @@
-package example.micronaut.datatype;
+package example.micronaut.gguf;
 
 public enum MetadataValueType {
     // The value is a 8-bit unsigned integer.

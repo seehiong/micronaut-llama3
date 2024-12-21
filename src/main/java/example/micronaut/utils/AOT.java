@@ -8,7 +8,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.Map;
 import java.util.Objects;
 
-import example.micronaut.datatype.GGMLTensorEntry;
+import example.micronaut.gguf.GGMLTensorEntry;
 import example.micronaut.gguf.GGUF;
 import example.micronaut.model.Llama;
 import example.micronaut.model.PartialModel;
@@ -77,7 +77,7 @@ public class AOT {
             return null;
         }
         Llama baseModel = preLoaded.model();
-        try (var fileChannel = FileChannel.open(modelPath, StandardOpenOption.READ)) {
+        try (var timer = Timer.log("Load tensors from pre-loaded model"); var fileChannel = FileChannel.open(modelPath, StandardOpenOption.READ)) {
             // Load only the tensors (mmap slices).
             Map<String, GGMLTensorEntry> tensorEntries = TensorUtils.loadTensors(fileChannel,
                     preLoaded.tensorDataOffset(),

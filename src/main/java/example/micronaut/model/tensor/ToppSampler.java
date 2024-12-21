@@ -3,8 +3,6 @@ package example.micronaut.model.tensor;
 import java.util.Comparator;
 import java.util.random.RandomGenerator;
 
-import example.micronaut.utils.SamplingUtils;
-
 public class ToppSampler implements Sampler {
 
     final int[] indices;
@@ -15,6 +13,28 @@ public class ToppSampler implements Sampler {
         this.indices = new int[maxNumberOfElements];
         this.topp = topp;
         this.rng = rng;
+    }
+
+    private void swap(int[] array, int from, int to) {
+        int tmp = array[from];
+        array[from] = array[to];
+        array[to] = tmp;
+    }
+
+    private void siftDown(int[] array, int from, int n, Comparator<Integer> comparator) {
+        int prev = from, next;
+        while ((next = 2 * prev + 1) < n) {
+            int r = 2 * prev + 2;
+            if (r < n && comparator.compare(array[r], array[next]) < 0) {
+                next = r;
+            }
+            if (comparator.compare(array[next], array[prev]) < 0) {
+                swap(array, prev, next);
+                prev = next;
+            } else {
+                break;
+            }
+        }
     }
 
     @Override
@@ -41,7 +61,7 @@ public class ToppSampler implements Sampler {
         int n0 = head;
         // build heap O(n0)
         for (int i = n0 / 2 - 1; i >= 0; --i) {
-            SamplingUtils.siftDown(indices, i, n0, comparator);
+            siftDown(indices, i, n0, comparator);
         }
 
         // truncate the list where cumulative probability of the largest k elements
@@ -50,13 +70,13 @@ public class ToppSampler implements Sampler {
         float cumulativeProb = 0.0f;
         int lastIndex = 0;
         for (int i = n0 - 1; i >= 0; i--) {
-            SamplingUtils.swap(indices, 0, i);
+            swap(indices, 0, i);
             cumulativeProb += logits.getFloat(indices[i]);
             if (cumulativeProb > topp) {
                 lastIndex = i;
                 break; // we've exceeded topp by including lastIndex
             }
-            SamplingUtils.siftDown(indices, 0, i - 1, comparator);
+            siftDown(indices, 0, i - 1, comparator);
         }
 
         // sample from the truncated list

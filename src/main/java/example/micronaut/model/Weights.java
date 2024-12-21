@@ -5,6 +5,7 @@ import java.nio.FloatBuffer;
 import example.micronaut.model.tensor.FloatTensor;
 
 public class Weights {
+
     // token embedding table
     public final FloatTensor token_embedding_table; // (vocab_size, dim)
     // weights for rmsnorms

@@ -2,9 +2,9 @@ package example.micronaut.model;
 
 import java.util.stream.Stream;
 
+import example.micronaut.model.tensor.ArrayFloatTensor;
 import example.micronaut.model.tensor.FloatTensor;
 import example.micronaut.utils.TransformerUtils;
-import example.micronaut.model.tensor.ArrayFloatTensor;
 
 public class State {
 
@@ -25,7 +25,9 @@ public class State {
     public final FloatTensor[] keyCache; // (n_layer, seq_len, kv_dim)
     public final FloatTensor[] valueCache; // (n_layer, seq_len, kv_dim)
 
-    /** last index in previous block */
+    /**
+     * last index in previous block
+     */
     public int idxPrevBlock;
 
     public int latestToken;

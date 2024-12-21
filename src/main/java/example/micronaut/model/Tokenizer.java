@@ -23,7 +23,6 @@ import java.util.stream.IntStream;
  * tokenizer</a>
  */
 public class Tokenizer {
-
     private final Pattern compiledPattern;
     private final Vocabulary vocabulary;
     private final Map<Pair<Integer, Integer>, Integer> merges;

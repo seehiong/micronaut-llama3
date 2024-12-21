@@ -5,9 +5,8 @@ import java.lang.foreign.MemorySegment;
 import java.lang.reflect.Field;
 import java.util.Arrays;
 
-import example.micronaut.datatype.GGMLType;
-import example.micronaut.model.Parallel;
-import io.micronaut.context.annotation.Value;
+import example.micronaut.gguf.GGMLType;
+import example.micronaut.utils.Parallel;
 import jdk.incubator.vector.FloatVector;
 import jdk.incubator.vector.VectorShape;
 import jdk.incubator.vector.VectorSpecies;
@@ -20,12 +19,9 @@ import jdk.incubator.vector.VectorSpecies;
  */
 public abstract class FloatTensor {
 
-    @Value("${llama.VectorBitSize}")
-    private int propVectorBitSize;
-
-    public final int VECTOR_BIT_SIZE = propVectorBitSize;
-
-    public final boolean USE_VECTOR_API = VECTOR_BIT_SIZE != 0;
+    public static final int VECTOR_BIT_SIZE = Integer.getInteger("llama.VectorBitSize",
+            VectorShape.preferredShape().vectorBitSize());
+    public static final boolean USE_VECTOR_API = VECTOR_BIT_SIZE != 0;
 
     // static final ValueLayout.OfFloat JAVA_FLOAT_LE =
     // ValueLayout.JAVA_FLOAT.withOrder(ByteOrder.LITTLE_ENDIAN);
@@ -33,7 +29,7 @@ public abstract class FloatTensor {
     // ValueLayout.JAVA_SHORT.withOrder(ByteOrder.LITTLE_ENDIAN);
     // The use of Unsafe in this file is a temporary workaround to support
     // native-image.
-    static final Unsafe UNSAFE;
+    public static final Unsafe UNSAFE;
 
     static {
         try {
@@ -45,21 +41,34 @@ public abstract class FloatTensor {
         }
     }
 
-    static short readShort(MemorySegment memorySegment, long offset) {
+    public static short readShort(MemorySegment memorySegment, long offset) {
         // The MemorySegment.get* methods should be used instead.
         return UNSAFE.getShort(memorySegment.address() + offset);
     }
 
-    static byte readByte(MemorySegment memorySegment, long offset) {
+    public static byte readByte(MemorySegment memorySegment, long offset) {
         // The MemorySegment.get* methods should be used instead.
         return UNSAFE.getByte(memorySegment.address() + offset);
     }
 
     // Preferred vector size for the fast multiplication routines.
     // (Apple Silicon) NEON only supports up-to 128bit vectors.
-    public final VectorSpecies<Float> F_SPECIES = USE_VECTOR_API
-            ? VectorShape.forBitSize(VECTOR_BIT_SIZE).withLanes(float.class)
-            : null;
+    public static final VectorSpecies<Float> F_SPECIES;
+    public static final VectorSpecies<Integer> I_SPECIES;
+    public static final VectorSpecies<Short> S_SPECIES_HALF;
+
+    static {
+        if (USE_VECTOR_API) {
+            F_SPECIES = VectorShape.forBitSize(VECTOR_BIT_SIZE).withLanes(float.class);
+            I_SPECIES = F_SPECIES.withLanes(int.class);
+            S_SPECIES_HALF = VectorShape.forBitSize(F_SPECIES.vectorBitSize() / 2).withLanes(short.class);
+            assert F_SPECIES.length() == S_SPECIES_HALF.length();
+        } else {
+            F_SPECIES = null;
+            I_SPECIES = null;
+            S_SPECIES_HALF = null;
+        }
+    }
 
     public abstract int size();
 
@@ -67,16 +76,16 @@ public abstract class FloatTensor {
 
     public abstract void setFloat(int index, float value);
 
-    abstract FloatVector getFloatVector(VectorSpecies<Float> species, int offset);
+    public abstract FloatVector getFloatVector(VectorSpecies<Float> species, int offset);
 
-    abstract GGMLType type();
+    public abstract GGMLType type();
 
     public static int numberOfElements(int... dimensions) {
         assert Arrays.stream(dimensions).allMatch(i -> i > 0);
         return Arrays.stream(dimensions).reduce(Math::multiplyExact).orElseThrow();
     }
 
-    static float scalarDot(FloatTensor thiz, int thisOffset, FloatTensor that, int thatOffset, int size) {
+    public static float scalarDot(FloatTensor thiz, int thisOffset, FloatTensor that, int thatOffset, int size) {
         float result = 0f;
         for (int j = 0; j < size; j++) {
             result += thiz.getFloat(thisOffset + j) * that.getFloat(thatOffset + j);
@@ -117,11 +126,11 @@ public abstract class FloatTensor {
         return result;
     }
 
-    float sum(int thisOffset, int size) {
+    public float sum(int thisOffset, int size) {
         return reduce(thisOffset, size, 0f, Float::sum);
     }
 
-    float max(int thisOffset, int size) {
+    public float max(int thisOffset, int size) {
         return reduce(thisOffset, size, Float.NEGATIVE_INFINITY, Float::max);
     }
 
@@ -129,7 +138,7 @@ public abstract class FloatTensor {
         that.mapWithIndexInPlace(thatOffset, size, (value, index) -> this.getFloat(index - thatOffset + thisOffset));
     }
 
-    int argmax(int thisOffset, int size) {
+    public int argmax(int thisOffset, int size) {
         assert size > 0;
         int maxIndex = thisOffset;
         float maxValue = this.getFloat(maxIndex);
@@ -144,7 +153,7 @@ public abstract class FloatTensor {
         return maxIndex;
     }
 
-    int argmax() {
+    public int argmax() {
         return argmax(0, size());
     }
 
@@ -160,7 +169,7 @@ public abstract class FloatTensor {
         float apply(float value, int index);
     }
 
-    FloatTensor mapInPlace(int thisOffset, int size, MapFunction mapFunction) {
+    public FloatTensor mapInPlace(int thisOffset, int size, MapFunction mapFunction) {
         int endIndex = thisOffset + size;
         for (int i = thisOffset; i < endIndex; ++i) {
             setFloat(i, mapFunction.apply(getFloat(i)));
@@ -181,7 +190,7 @@ public abstract class FloatTensor {
         return this;
     }
 
-    FloatTensor addInPlace(int thisOffset, FloatTensor that, int thatOffset, int size) {
+    public FloatTensor addInPlace(int thisOffset, FloatTensor that, int thatOffset, int size) {
         return mapWithIndexInPlace(thisOffset, size,
                 (value, index) -> value + that.getFloat(index - thisOffset + thatOffset));
     }
@@ -190,7 +199,7 @@ public abstract class FloatTensor {
         return addInPlace(0, that, 0, size());
     }
 
-    FloatTensor multiplyInPlace(int thisOffset, FloatTensor that, int thatOffset, int size) {
+    public FloatTensor multiplyInPlace(int thisOffset, FloatTensor that, int thatOffset, int size) {
         return mapWithIndexInPlace(thisOffset, size,
                 (value, index) -> value * that.getFloat(index - thisOffset + thatOffset));
     }

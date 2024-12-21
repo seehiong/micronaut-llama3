@@ -10,9 +10,11 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.IntFunction;
 
-import example.micronaut.datatype.GGMLTensorEntry;
-import example.micronaut.datatype.GGMLType;
-import example.micronaut.datatype.GGUFTensorInfo;
+import example.micronaut.gguf.GGMLTensorEntry;
+import example.micronaut.gguf.GGMLType;
+import example.micronaut.gguf.GGUFTensorInfo;
+import example.micronaut.model.tensor.BF16FloatTensor;
+import example.micronaut.model.tensor.F16FloatTensor;
 import example.micronaut.model.tensor.FloatTensor;
 import example.micronaut.model.tensor.Q4_0FloatTensor;
 import example.micronaut.model.tensor.Q8_0FloatTensor;
@@ -21,7 +23,6 @@ import lombok.experimental.UtilityClass;
 @UtilityClass
 public class TensorUtils {
 
-    @SuppressWarnings("preview")
     public Map<String, GGMLTensorEntry> loadTensors(FileChannel fileChannel, long tensorDataOffset,
             Map<String, GGUFTensorInfo> tensorInfos) throws IOException {
         Arena arena = Arena.ofAuto();
@@ -44,9 +45,16 @@ public class TensorUtils {
         return switch (ggmlType) {
             // case F32 -> new F32FloatTensor(FloatTensor.numberOfElements(entry.shape()),
             // entry.memorySegment());
-            case Q8_0 -> new Q8_0FloatTensor(FloatTensor.numberOfElements(entry.shape()), entry.memorySegment());
-            case Q4_0 -> new Q4_0FloatTensor(FloatTensor.numberOfElements(entry.shape()), entry.memorySegment());
-            default -> throw new UnsupportedOperationException("Quantization format " + ggmlType);
+            case Q8_0 ->
+                new Q8_0FloatTensor(FloatTensor.numberOfElements(entry.shape()), entry.memorySegment());
+            case Q4_0 ->
+                new Q4_0FloatTensor(FloatTensor.numberOfElements(entry.shape()), entry.memorySegment());
+            case BF16 ->
+                new BF16FloatTensor(FloatTensor.numberOfElements(entry.shape()), entry.memorySegment());
+            case F16 ->
+                new F16FloatTensor(FloatTensor.numberOfElements(entry.shape()), entry.memorySegment());
+            default ->
+                throw new UnsupportedOperationException("Quantization format " + ggmlType);
         };
     }
 
@@ -69,8 +77,10 @@ public class TensorUtils {
     public FloatBuffer toFloatBuffer(GGMLTensorEntry tensorEntry) {
         GGMLType ggmlType = tensorEntry.ggmlType();
         return switch (ggmlType) {
-            case F32 -> tensorEntry.memorySegment().asByteBuffer().order(ByteOrder.LITTLE_ENDIAN).asFloatBuffer();
-            default -> throw new UnsupportedOperationException("Conversion to " + ggmlType);
+            case F32 ->
+                tensorEntry.memorySegment().asByteBuffer().order(ByteOrder.LITTLE_ENDIAN).asFloatBuffer();
+            default ->
+                throw new UnsupportedOperationException("Conversion to " + ggmlType);
         };
     }
 

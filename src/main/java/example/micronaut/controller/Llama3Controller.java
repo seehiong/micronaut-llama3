@@ -57,17 +57,18 @@ public class Llama3Controller {
             propSeed = System.nanoTime();
         }
         Path modelPath = Paths.get(propModelPath);
+        options = new LlamaOptions(modelPath, null, null, true, propTemperature, propTopp, propSeed, propMaxTokens,
+                propStream, propEcho);
 
-        model = AOT.tryUsePreLoaded(modelPath, propMaxTokens);
+        model = AOT.tryUsePreLoaded(options.getModelPath(), options.getMaxTokens());
         if (model == null) {
             // No compatible preloaded model found, fallback to fully parse and load the
             // specified file.
-            model = ModelLoader.loadModel(modelPath, propMaxTokens, true);
+            model = ModelLoader.loadModel(options.getModelPath(), options.getMaxTokens(), true);
         }
-        sampler = SamplingUtils.selectSampler(model.configuration().vocabularySize, propTemperature, propTopp, propSeed);
-
-        options = new LlamaOptions(modelPath, null, null, true, propTemperature, propTopp, propSeed, propMaxTokens,
-                propStream, propEcho);
+        sampler = SamplingUtils.selectSampler(model.configuration().vocabularySize, options.getTemperature(),
+                options.getTopp(),
+                options.getSeed());
     }
 
     @Get(value = "/generate", produces = MediaType.TEXT_EVENT_STREAM)

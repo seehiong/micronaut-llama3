@@ -10,9 +10,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import example.micronaut.datatype.GGMLType;
-import example.micronaut.datatype.GGUFTensorInfo;
-import example.micronaut.datatype.MetadataValueType;
 import example.micronaut.model.Pair;
 import example.micronaut.utils.Timer;
 

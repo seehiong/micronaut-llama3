@@ -31,14 +31,16 @@ public class Llama3Service {
             if (options.getSystemPrompt() != null) {
                 conversationTokens.addAll(
                         chatFormat
-                                .encodeMessage(new ChatFormat.Message(ChatFormat.Role.SYSTEM, options.getSystemPrompt())));
+                                .encodeMessage(
+                                        new ChatFormat.Message(ChatFormat.Role.SYSTEM, options.getSystemPrompt())));
             }
             int startPosition = 0;
 
             if (state == null) {
                 state = model.createNewState(propBatchSize);
             }
-            conversationTokens.addAll(chatFormat.encodeMessage(new ChatFormat.Message(ChatFormat.Role.USER, options.getPrompt())));
+            conversationTokens.addAll(
+                    chatFormat.encodeMessage(new ChatFormat.Message(ChatFormat.Role.USER, options.getPrompt())));
             conversationTokens.addAll(chatFormat.encodeHeader(new ChatFormat.Message(ChatFormat.Role.ASSISTANT, "")));
             Set<Integer> stopTokens = chatFormat.getStopTokens();
             List<Integer> responseTokens = TokenUtils.generateTokens(model, state, startPosition,
@@ -59,6 +61,10 @@ public class Llama3Service {
                 stopToken = responseTokens.getLast();
                 responseTokens.removeLast();
             }
+            if (!options.isStream()) {
+                String responseText = model.tokenizer().decode(responseTokens);
+                emitter.next(responseText);
+            }
             if (stopToken == null) {
                 emitter.next("Ran out of context length...");
             }
@@ -77,10 +83,12 @@ public class Llama3Service {
             if (options.getSystemPrompt() != null) {
                 promptTokens.addAll(
                         chatFormat
-                                .encodeMessage(new ChatFormat.Message(ChatFormat.Role.SYSTEM, options.getSystemPrompt())));
+                                .encodeMessage(
+                                        new ChatFormat.Message(ChatFormat.Role.SYSTEM, options.getSystemPrompt())));
             }
             promptTokens
-                    .addAll(chatFormat.encodeMessage(new ChatFormat.Message(ChatFormat.Role.USER, options.getPrompt())));
+                    .addAll(chatFormat
+                            .encodeMessage(new ChatFormat.Message(ChatFormat.Role.USER, options.getPrompt())));
             promptTokens.addAll(chatFormat.encodeHeader(new ChatFormat.Message(ChatFormat.Role.ASSISTANT, "")));
 
             Set<Integer> stopTokens = chatFormat.getStopTokens();

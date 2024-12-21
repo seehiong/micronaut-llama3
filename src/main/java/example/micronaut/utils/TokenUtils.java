@@ -36,7 +36,8 @@ public class TokenUtils {
 
         assert specialTokensList.stream().allMatch(token -> vocabulary.getIndex(token).isPresent());
 
-        Map<String, Integer> specialTokens = IntStream.range(0, specialTokensList.size())
+        Map<String, Integer> specialTokens;
+        specialTokens = IntStream.range(0, specialTokensList.size())
                 .boxed()
                 .collect(Collectors.toMap(
                         i -> specialTokensList.get(i),
@@ -136,7 +137,7 @@ public class TokenUtils {
         long elapsedNanos = System.nanoTime() - startNanos;
         long promptNanos = startGen - startNanos;
         long genNanos = elapsedNanos - startGen + startNanos;
-        System.err.printf("%nprompt: %.2f tokens/s (%d) generation: %.2f tokens/s (%d)%n",
+        System.err.printf("%nprompt: %.2f tokens/s (%d) generation: %.2f tokens/s (%d)%n/n/n",
                 promptTokens.size() / (promptNanos / 1_000_000_000.0), promptTokens.size(),
                 generatedTokens.size() / (genNanos / 1_000_000_000.0), generatedTokens.size());
 

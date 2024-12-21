@@ -2,7 +2,7 @@ package example.micronaut.model.tensor;
 
 import java.util.Arrays;
 
-import example.micronaut.datatype.GGMLType;
+import example.micronaut.gguf.GGMLType;
 import jdk.incubator.vector.FloatVector;
 import jdk.incubator.vector.VectorSpecies;
 

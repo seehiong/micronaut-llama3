@@ -3,13 +3,12 @@ package example.micronaut.utils;
 import java.nio.FloatBuffer;
 import java.util.stream.IntStream;
 
-import example.micronaut.model.tensor.FloatTensor;
 import example.micronaut.model.Configuration;
 import example.micronaut.model.Llama;
-import example.micronaut.model.Parallel;
 import example.micronaut.model.State;
 import example.micronaut.model.Weights;
 import example.micronaut.model.tensor.ArrayFloatTensor;
+import example.micronaut.model.tensor.FloatTensor;
 import lombok.experimental.UtilityClass;
 
 @UtilityClass
@@ -40,7 +39,7 @@ public class TransformerUtils {
         int headSize = config.headSize;
         int kvDim = (config.dim * config.numberOfKeyValueHeads) / config.numberOfHeads;
         int kvMul = config.numberOfHeads / config.numberOfKeyValueHeads; // integer multiplier of the kv sharing in
-                                                                         // multiquery
+        // multiquery
         float sqrtHeadSize = (float) Math.sqrt(headSize);
         final int nTokens = tokens.length;
 

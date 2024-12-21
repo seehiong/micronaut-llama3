@@ -4,8 +4,8 @@ import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.nio.ByteOrder;
 
-import example.micronaut.datatype.Float16;
-import example.micronaut.datatype.GGMLType;
+import example.micronaut.gguf.Float16;
+import example.micronaut.gguf.GGMLType;
 import jdk.incubator.vector.ByteVector;
 import jdk.incubator.vector.FloatVector;
 import jdk.incubator.vector.VectorOperators;
@@ -32,7 +32,7 @@ public class Q8_0FloatTensor extends FloatTensor {
     }
 
     @Override
-    FloatVector getFloatVector(VectorSpecies<Float> species, int index) {
+    public FloatVector getFloatVector(VectorSpecies<Float> species, int index) {
         throw new UnsupportedOperationException("getFloatVector");
     }
 
@@ -123,7 +123,8 @@ public class Q8_0FloatTensor extends FloatTensor {
                         val = sum0.add(sum1).add(sum2).add(sum3).fma(wScale, val);
                     }
                 }
-                default -> throw new UnsupportedOperationException(F_SPECIES.toString());
+                default ->
+                    throw new UnsupportedOperationException(F_SPECIES.toString());
             }
         }
         result += val.reduceLanes(VectorOperators.ADD);

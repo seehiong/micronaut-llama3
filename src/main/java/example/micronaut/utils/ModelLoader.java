@@ -7,7 +7,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Map;
 
-import example.micronaut.datatype.GGMLTensorEntry;
+import example.micronaut.gguf.GGMLTensorEntry;
 import example.micronaut.gguf.GGUF;
 import example.micronaut.model.Configuration;
 import example.micronaut.model.Llama;
@@ -27,7 +27,8 @@ public class ModelLoader {
     private Vocabulary loadVocabulary(Map<String, Object> metadata) {
         String model = (String) metadata.get("tokenizer.ggml.model");
         if (!TOKENIZER_LLAMA_3_MODEL.equals(model)) {
-            throw new IllegalArgumentException("expected " + TOKENIZER_LLAMA_3_MODEL + " but found " + model);
+            throw new IllegalArgumentException(
+                    "expected " + TOKENIZER_LLAMA_3_MODEL + " but found " + model);
         }
         String[] tokens = (String[]) metadata.get("tokenizer.ggml.tokens");
         return new Vocabulary(tokens, null);
@@ -57,7 +58,8 @@ public class ModelLoader {
                     vocabulary.size(),
                     (int) metadata.get("llama.context_length"),
                     (float) metadata.getOrDefault("llama.attention.layer_norm_rms_epsilon", 1e-5f),
-                    (float) metadata.getOrDefault("llama.rope.freq_base", 10000f)).withContextLength(contextLength);
+                    (float) metadata.getOrDefault("llama.rope.freq_base", 10000f))
+                    .withContextLength(contextLength);
 
             Weights weights = null;
             if (loadWeights) {
@@ -109,7 +111,8 @@ public class ModelLoader {
                 // If "output.weight" is not present then the embedding weights are tied/shared
                 // with the decoder.
                 // This is commonly referred as "tie word embeddings".
-                TensorUtils.loadQuantized(tensorEntries.getOrDefault("output.weight", tokenEmbeddings)));
+                TensorUtils.loadQuantized(
+                        tensorEntries.getOrDefault("output.weight", tokenEmbeddings)));
 
         return qw;
     }

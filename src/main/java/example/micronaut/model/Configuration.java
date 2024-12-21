@@ -1,6 +1,7 @@
 package example.micronaut.model;
 
 public class Configuration {
+
     public final int dim; // transformer dimension
     public final int hiddenDim; // for ffn layers
     public final int numberOfLayers; // number of layers

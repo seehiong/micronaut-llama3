@@ -1,6 +1,5 @@
 package example.micronaut.utils;
 
-import java.util.Comparator;
 import java.util.random.RandomGenerator;
 import java.util.random.RandomGeneratorFactory;
 
@@ -11,28 +10,6 @@ import lombok.experimental.UtilityClass;
 
 @UtilityClass
 public class SamplingUtils {
-
-    public void swap(int[] array, int from, int to) {
-        int tmp = array[from];
-        array[from] = array[to];
-        array[to] = tmp;
-    }
-
-    public void siftDown(int[] array, int from, int n, Comparator<Integer> comparator) {
-        int prev = from, next;
-        while ((next = 2 * prev + 1) < n) {
-            int r = 2 * prev + 2;
-            if (r < n && comparator.compare(array[r], array[next]) < 0) {
-                next = r;
-            }
-            if (comparator.compare(array[next], array[prev]) < 0) {
-                swap(array, prev, next);
-                prev = next;
-            } else {
-                break;
-            }
-        }
-    }
 
     public Sampler selectSampler(int vocabularySize, float temperature, float topp, long rngSeed) {
         Sampler sampler;

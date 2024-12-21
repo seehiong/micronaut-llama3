@@ -1,4 +1,4 @@
-package example.micronaut.datatype;
+package example.micronaut.gguf;
 
 import java.lang.foreign.MemorySegment;
 
