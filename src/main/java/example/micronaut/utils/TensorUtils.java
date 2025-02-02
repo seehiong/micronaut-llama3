@@ -6,6 +6,7 @@ import java.lang.foreign.MemorySegment;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import java.nio.channels.FileChannel;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.IntFunction;
@@ -17,6 +18,8 @@ import example.micronaut.model.tensor.BF16FloatTensor;
 import example.micronaut.model.tensor.F16FloatTensor;
 import example.micronaut.model.tensor.FloatTensor;
 import example.micronaut.model.tensor.Q4_0FloatTensor;
+import example.micronaut.model.tensor.Q4_KFloatTensor;
+import example.micronaut.model.tensor.Q6_KFloatTensor;
 import example.micronaut.model.tensor.Q8_0FloatTensor;
 import lombok.experimental.UtilityClass;
 
@@ -31,7 +34,7 @@ public class TensorUtils {
         Map<String, GGMLTensorEntry> tensorEntries = HashMap.newHashMap(tensorInfos.size());
         for (Map.Entry<String, GGUFTensorInfo> entry : tensorInfos.entrySet()) {
             GGUFTensorInfo ti = entry.getValue();
-            int numberOfElements = FloatTensor.numberOfElements(ti.dimensions());
+            int numberOfElements = numberOfElements(ti.dimensions());
             int sizeInBytes = Math.toIntExact(ti.ggmlType().byteSizeFor(numberOfElements));
             MemorySegment memorySegment = tensorData.asSlice(ti.offset(), sizeInBytes);
             tensorEntries.put(ti.name(),
@@ -43,16 +46,20 @@ public class TensorUtils {
     public FloatTensor loadQuantized(GGMLTensorEntry entry) {
         GGMLType ggmlType = entry.ggmlType();
         return switch (ggmlType) {
-            // case F32 -> new F32FloatTensor(FloatTensor.numberOfElements(entry.shape()),
-            // entry.memorySegment());
             case Q8_0 ->
-                new Q8_0FloatTensor(FloatTensor.numberOfElements(entry.shape()), entry.memorySegment());
+                new Q8_0FloatTensor(numberOfElements(entry.shape()), entry.memorySegment());
             case Q4_0 ->
-                new Q4_0FloatTensor(FloatTensor.numberOfElements(entry.shape()), entry.memorySegment());
+                new Q4_0FloatTensor(numberOfElements(entry.shape()), entry.memorySegment());
+            case Q4_K ->
+                new Q4_KFloatTensor(numberOfElements(entry.shape()), entry.memorySegment());
+            case Q6_K ->
+                new Q6_KFloatTensor(numberOfElements(entry.shape()), entry.memorySegment());
             case BF16 ->
-                new BF16FloatTensor(FloatTensor.numberOfElements(entry.shape()), entry.memorySegment());
+                new BF16FloatTensor(numberOfElements(entry.shape()), entry.memorySegment());
             case F16 ->
-                new F16FloatTensor(FloatTensor.numberOfElements(entry.shape()), entry.memorySegment());
+                new F16FloatTensor(numberOfElements(entry.shape()), entry.memorySegment());
+            // case F32 -> new F32FloatTensor(numberOfElements(entry.shape()),
+            // entry.memorySegment());
             default ->
                 throw new UnsupportedOperationException("Quantization format " + ggmlType);
         };
@@ -82,6 +89,11 @@ public class TensorUtils {
             default ->
                 throw new UnsupportedOperationException("Conversion to " + ggmlType);
         };
+    }
+
+    public int numberOfElements(int... dimensions) {
+        assert Arrays.stream(dimensions).allMatch(i -> i > 0);
+        return Arrays.stream(dimensions).reduce(Math::multiplyExact).orElseThrow();
     }
 
 }

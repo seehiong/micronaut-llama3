@@ -23,6 +23,7 @@ import java.util.stream.IntStream;
  * tokenizer</a>
  */
 public class Tokenizer {
+
     private final Pattern compiledPattern;
     private final Vocabulary vocabulary;
     private final Map<Pair<Integer, Integer>, Integer> merges;
@@ -45,6 +46,9 @@ public class Tokenizer {
 
     public Tokenizer(Vocabulary vocabulary, List<Pair<Integer, Integer>> merges, String regexPattern,
             Map<String, Integer> specialTokens) {
+        specialTokens.putIfAbsent("<|begin_of_text|>", 128000);
+        specialTokens.putIfAbsent("<|end_of_text|>", 128001);
+
         this.vocabulary = vocabulary;
         this.compiledPattern = regexPattern != null ? Pattern.compile(regexPattern) : null;
         this.specialTokens = new HashMap<>(specialTokens);
@@ -263,7 +267,18 @@ public class Tokenizer {
 
     public String decode(List<Integer> tokens) {
         String decoded = decodeImpl(tokens);
-        int[] decodedBytesAsInts = decoded.codePoints().map(BYTE_DECODER::get).toArray();
+
+        //int[] decodedBytesAsInts = decoded.codePoints().map(BYTE_DECODER::get).toArray();
+        int[] decodedBytesAsInts = decoded.codePoints()
+                .map(cp -> {
+                    Integer decodedByte = BYTE_DECODER.get(cp);
+                    if (decodedByte == null) {
+                        return (int) '?';
+                    }
+                    return decodedByte;
+                })
+                .toArray();
+
         byte[] rawBytes = new byte[decodedBytesAsInts.length];
         for (int i = 0; i < decoded.length(); i++) {
             rawBytes[i] = (byte) decodedBytesAsInts[i];

@@ -55,7 +55,6 @@ public class Llama3Service {
             // Include stop token in the prompt history, but not in the response displayed
             // to the user.
             conversationTokens.addAll(responseTokens);
-            startPosition = conversationTokens.size();
             Integer stopToken = null;
             if (!responseTokens.isEmpty() && stopTokens.contains(responseTokens.getLast())) {
                 stopToken = responseTokens.getLast();
@@ -78,6 +77,7 @@ public class Llama3Service {
 
             State state = model.createNewState(propBatchSize);
             ChatFormat chatFormat = new ChatFormat(model.tokenizer());
+            StringBuilder responseBuilder = new StringBuilder();
             List<Integer> promptTokens = new ArrayList<>();
             promptTokens.add(chatFormat.beginOfText);
             if (options.getSystemPrompt() != null) {
@@ -96,7 +96,17 @@ public class Llama3Service {
                     options.getMaxTokens(), sampler, options.isEcho(), token -> {
                 if (options.isStream()) {
                     if (!model.tokenizer().isSpecialToken(token)) {
-                        emitter.next(model.tokenizer().decode(List.of(token)));
+                        String decodedToken = model.tokenizer().decode(List.of(token));
+                        responseBuilder.append(decodedToken);
+                        String escapedResponse = responseBuilder.toString()
+                                .replace("\n", "\\n") // Replace newlines with \n
+                                .replace("\r", "\\r");
+
+                        if (options.isFullResponseStream()) {
+                            emitter.next(escapedResponse + "\n\n");
+                        } else {
+                            emitter.next(decodedToken);
+                        }
                     }
                 }
             });

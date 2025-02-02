@@ -113,7 +113,6 @@ public class ModelLoader {
                 // This is commonly referred as "tie word embeddings".
                 TensorUtils.loadQuantized(
                         tensorEntries.getOrDefault("output.weight", tokenEmbeddings)));
-
         return qw;
     }
 }

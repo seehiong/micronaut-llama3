@@ -21,4 +21,5 @@ public class LlamaOptions {
     int maxTokens;
     boolean stream;
     boolean echo;
+    boolean fullResponseStream;
 }

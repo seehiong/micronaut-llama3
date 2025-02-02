@@ -14,7 +14,7 @@ public class Application {
     private final String batchSize;
     private final String vectorBitSize;
 
-    public Application(@Value("${java.util.concurrent.ForkJoinPool.common.parallelism:8}") String parallelism,
+    public Application(@Value("${java.util.concurrent.ForkJoinPool.common.parallelism:16}") String parallelism,
             @Value("${llama.BatchSize}") String batchSize,
             @Value("${llama.VectorBitSize}") String vectorBitSize) {
         this.parallelism = parallelism;

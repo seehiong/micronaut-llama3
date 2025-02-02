@@ -3,6 +3,7 @@ package example.micronaut.model.tensor;
 import java.util.Arrays;
 
 import example.micronaut.gguf.GGMLType;
+import example.micronaut.utils.TensorUtils;
 import jdk.incubator.vector.FloatVector;
 import jdk.incubator.vector.VectorSpecies;
 
@@ -15,7 +16,7 @@ public class ArrayFloatTensor extends FloatTensor {
     }
 
     public static FloatTensor allocate(int... dims) {
-        int numberOfElements = FloatTensor.numberOfElements(dims);
+        int numberOfElements = TensorUtils.numberOfElements(dims);
         return new ArrayFloatTensor(new float[numberOfElements]);
     }
 

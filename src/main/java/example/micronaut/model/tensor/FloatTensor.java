@@ -1,12 +1,13 @@
 package example.micronaut.model.tensor;
 
 import sun.misc.Unsafe;
+
 import java.lang.foreign.MemorySegment;
 import java.lang.reflect.Field;
-import java.util.Arrays;
 
 import example.micronaut.gguf.GGMLType;
 import example.micronaut.utils.Parallel;
+import example.micronaut.utils.TransformerUtils;
 import jdk.incubator.vector.FloatVector;
 import jdk.incubator.vector.VectorShape;
 import jdk.incubator.vector.VectorSpecies;
@@ -41,13 +42,15 @@ public abstract class FloatTensor {
         }
     }
 
-    public static short readShort(MemorySegment memorySegment, long offset) {
-        // The MemorySegment.get* methods should be used instead.
+    protected short readShort(MemorySegment memorySegment, long offset) {
+        // The MemorySegment.get* methods should be used instead but it's slower
+        // return memorySegment.get(ValueLayout.JAVA_SHORT, offset); 
         return UNSAFE.getShort(memorySegment.address() + offset);
     }
 
-    public static byte readByte(MemorySegment memorySegment, long offset) {
-        // The MemorySegment.get* methods should be used instead.
+    protected byte readByte(MemorySegment memorySegment, long offset) {
+        // The MemorySegment.get* methods should be used instead but it's slower
+        // return memorySegment.get(ValueLayout.JAVA_BYTE, offset);
         return UNSAFE.getByte(memorySegment.address() + offset);
     }
 
@@ -80,12 +83,7 @@ public abstract class FloatTensor {
 
     public abstract GGMLType type();
 
-    public static int numberOfElements(int... dimensions) {
-        assert Arrays.stream(dimensions).allMatch(i -> i > 0);
-        return Arrays.stream(dimensions).reduce(Math::multiplyExact).orElseThrow();
-    }
-
-    public static float scalarDot(FloatTensor thiz, int thisOffset, FloatTensor that, int thatOffset, int size) {
+    protected float scalarDot(FloatTensor thiz, int thisOffset, FloatTensor that, int thatOffset, int size) {
         float result = 0f;
         for (int j = 0; j < size; j++) {
             result += thiz.getFloat(thisOffset + j) * that.getFloat(thatOffset + j);
@@ -170,9 +168,16 @@ public abstract class FloatTensor {
     }
 
     public FloatTensor mapInPlace(int thisOffset, int size, MapFunction mapFunction) {
-        int endIndex = thisOffset + size;
-        for (int i = thisOffset; i < endIndex; ++i) {
-            setFloat(i, mapFunction.apply(getFloat(i)));
+        // Pre-calculate end boundary
+        final int endIndex = thisOffset + size;
+
+        // Process in chunks to improve cache utilization
+        final int CHUNK_SIZE = 1024;
+        for (int chunk = thisOffset; chunk < endIndex; chunk += CHUNK_SIZE) {
+            int chunkEnd = Math.min(chunk + CHUNK_SIZE, endIndex);
+            for (int i = chunk; i < chunkEnd; i++) {
+                setFloat(i, mapFunction.apply(getFloat(i)));
+            }
         }
         return this;
     }
@@ -220,15 +225,15 @@ public abstract class FloatTensor {
         // find max value (for numerical stability)
         float maxVal = max(thisOffset, size);
         // exp and sum
-        mapInPlace(thisOffset, size, f -> (float) Math.exp(f - maxVal));
+        mapInPlace(thisOffset, size, f -> (float) TransformerUtils.fastExp(f - maxVal));
         float sum = sum(thisOffset, size);
         // normalize
         return divideInPlace(thisOffset, size, sum);
     }
 
     public FloatTensor saxpyInPlace(int thisOffset, FloatTensor that, int thatOffset, int size, float a) {
-        // this[thatOffset ... thatOffset + size) = a * that[thatOffset ... thatOffset +
-        // size) + this[thisOffset ... thisOffset + size)
+        // this[thatOffset ... thatOffset + size) = 
+        // a * that[thatOffset ... thatOffset + size) + this[thisOffset ... thisOffset + size)
         for (int i = 0; i < size; ++i) {
             setFloat(thisOffset + i, a * that.getFloat(thatOffset + i) + this.getFloat(thisOffset + i));
         }

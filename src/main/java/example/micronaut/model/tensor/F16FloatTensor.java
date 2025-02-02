@@ -50,7 +50,7 @@ public class F16FloatTensor extends FloatTensor {
         if (USE_VECTOR_API) {
             return vectorDot(this, thisOffset, (ArrayFloatTensor) that, thatOffset, size);
         } else {
-            return FloatTensor.scalarDot(this, thisOffset, that, thatOffset, size);
+            return super.scalarDot(this, thisOffset, that, thatOffset, size);
         }
     }
 

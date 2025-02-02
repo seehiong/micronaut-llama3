@@ -47,6 +47,9 @@ public class Llama3Controller {
     @Value("${options.echo}")
     private boolean propEcho;
 
+    @Value("${options.fullResponseStream}")
+    private boolean propFullResponseStream;
+
     private Llama model;
     private Sampler sampler;
     private LlamaOptions options;
@@ -58,7 +61,7 @@ public class Llama3Controller {
         }
         Path modelPath = Paths.get(propModelPath);
         options = new LlamaOptions(modelPath, null, null, true, propTemperature, propTopp, propSeed, propMaxTokens,
-                propStream, propEcho);
+                propStream, propEcho, propFullResponseStream);
 
         model = AOT.tryUsePreLoaded(options.getModelPath(), options.getMaxTokens());
         if (model == null) {
@@ -86,5 +89,4 @@ public class Llama3Controller {
         options.setInteractive(true);
         return llama3Service.runInteractive(model, sampler, options);
     }
-
 }

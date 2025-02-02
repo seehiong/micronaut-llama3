@@ -41,10 +41,7 @@ public class GGUF {
         return metadata;
     }
 
-    private final ByteBuffer BB_1 = ByteBuffer.allocate(Byte.BYTES).order(ByteOrder.LITTLE_ENDIAN);
-    private final ByteBuffer BB_2 = ByteBuffer.allocate(Short.BYTES).order(ByteOrder.LITTLE_ENDIAN);
-    private final ByteBuffer BB_4 = ByteBuffer.allocate(Integer.BYTES).order(ByteOrder.LITTLE_ENDIAN);
-    private final ByteBuffer BB_8 = ByteBuffer.allocate(Long.BYTES).order(ByteOrder.LITTLE_ENDIAN);
+    private final ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES).order(ByteOrder.LITTLE_ENDIAN);
 
     public static GGUF loadModel(Path modelPath) throws IOException {
         try (FileChannel fileChannel = FileChannel.open(modelPath); var ignored = Timer.log("Parse " + modelPath)) {
@@ -122,14 +119,11 @@ public class GGUF {
     }
 
     private String readString(FileChannel fileChannel) throws IOException {
-        // A string in GGUF.
-        // The length of the string, in bytes.
-        int len = Math.toIntExact(readLong(fileChannel)); // uint64_t len;
-        // The string as a UTF-8 non-null-terminated string.
-        byte[] bytes = new byte[len]; // char string[len];
-        int bytesRead = fileChannel.read(ByteBuffer.wrap(bytes));
+        int len = Math.toIntExact(readLong(fileChannel));
+        ByteBuffer stringBuffer = ByteBuffer.allocate(len);
+        int bytesRead = fileChannel.read(stringBuffer);
         assert len == bytesRead;
-        return new String(bytes, StandardCharsets.UTF_8);
+        return new String(stringBuffer.array(), StandardCharsets.UTF_8);
     }
 
     private Pair<String, Object> readKeyValuePair(FileChannel fileChannel) throws IOException {
@@ -196,64 +190,89 @@ public class GGUF {
 
     private Object readArray(FileChannel fileChannel) throws IOException {
         // Any value type is valid, including arrays.
-        MetadataValueType value_type = readMetadataValueType(fileChannel); // gguf_metadata_value_type type;
+        MetadataValueType valueType = readMetadataValueType(fileChannel); // gguf_metadata_value_type type;
         // Number of elements, not bytes
         int len = Math.toIntExact(readLong(fileChannel)); // uint64_t len;
-        // The array of values.
-        // gguf_metadata_value_t array[len];
-        switch (value_type) {
-            case UINT8, INT8 -> {
-                byte[] bytes = new byte[len];
-                for (int i = 0; i < len; ++i) {
-                    bytes[i] = readByte(fileChannel);
-                }
-                return bytes;
-            }
-            case UINT16, INT16 -> {
-                short[] shorts = new short[len];
-                for (int i = 0; i < len; ++i) {
-                    shorts[i] = readShort(fileChannel);
-                }
-                return shorts;
-            }
-            case UINT32, INT32 -> {
-                int[] ints = new int[len];
-                for (int i = 0; i < len; ++i) {
-                    ints[i] = readInt(fileChannel);
-                }
-                return ints;
-            }
-            case FLOAT32 -> {
-                float[] floats = new float[len];
-                for (int i = 0; i < len; ++i) {
-                    floats[i] = readFloat(fileChannel);
-                }
-                return floats;
-            }
-            case BOOL -> {
-                boolean[] booleans = new boolean[len];
-                for (int i = 0; i < len; ++i) {
-                    booleans[i] = readBoolean(fileChannel);
-                }
-                return booleans;
-            }
-            case STRING -> {
-                String[] strings = new String[len];
-                for (int i = 0; i < len; ++i) {
-                    strings[i] = readString(fileChannel);
-                }
-                return strings;
-            }
-            case ARRAY -> {
-                Object[] arrays = new Object[len];
-                for (int i = 0; i < len; ++i) {
-                    arrays[i] = readArray(fileChannel);
-                }
-                return arrays;
-            }
+
+        return switch (valueType) {
+            case UINT8, INT8 ->
+                readByteArray(fileChannel, len);
+            case UINT16, INT16 ->
+                readShortArray(fileChannel, len);
+            case UINT32, INT32 ->
+                readIntArray(fileChannel, len);
+            case FLOAT32 ->
+                readFloatArray(fileChannel, len);
+            case BOOL ->
+                readBooleanArray(fileChannel, len);
+            case STRING ->
+                readStringArray(fileChannel, len);
+            case ARRAY ->
+                readNestedArray(fileChannel, len);
             default ->
-                throw new UnsupportedOperationException("read array of " + value_type);
+                throw new UnsupportedOperationException("Read array of " + valueType);
+        };
+    }
+
+    private byte[] readByteArray(FileChannel fileChannel, int len) throws IOException {
+        byte[] bytes = new byte[len];
+        ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+        fileChannel.read(byteBuffer);
+        return bytes;
+    }
+
+    private short[] readShortArray(FileChannel fileChannel, int len) throws IOException {
+        short[] shorts = new short[len];
+        ByteBuffer shortBuffer = ByteBuffer.allocate(len * Short.BYTES).order(ByteOrder.LITTLE_ENDIAN);
+        fileChannel.read(shortBuffer);
+        shortBuffer.flip();
+        shortBuffer.asShortBuffer().get(shorts);
+        return shorts;
+    }
+
+    private int[] readIntArray(FileChannel fileChannel, int len) throws IOException {
+        int[] ints = new int[len];
+        ByteBuffer intBuffer = ByteBuffer.allocate(len * Integer.BYTES).order(ByteOrder.LITTLE_ENDIAN);
+        fileChannel.read(intBuffer);
+        intBuffer.flip();
+        intBuffer.asIntBuffer().get(ints);
+        return ints;
+    }
+
+    private float[] readFloatArray(FileChannel fileChannel, int len) throws IOException {
+        float[] floats = new float[len];
+        ByteBuffer floatBuffer = ByteBuffer.allocate(len * Float.BYTES).order(ByteOrder.LITTLE_ENDIAN);
+        fileChannel.read(floatBuffer);
+        floatBuffer.flip();
+        floatBuffer.asFloatBuffer().get(floats);
+        return floats;
+    }
+
+    private boolean[] readBooleanArray(FileChannel fileChannel, int len) throws IOException {
+        boolean[] booleans = new boolean[len];
+        byte[] bytes = new byte[len];
+        ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+        fileChannel.read(byteBuffer);
+        for (int i = 0; i < len; i++) {
+            booleans[i] = bytes[i] != 0;
         }
+        return booleans;
+    }
+
+    private String[] readStringArray(FileChannel fileChannel, int len) throws IOException {
+        String[] strings = new String[len];
+        for (int i = 0; i < len; i++) {
+            strings[i] = readString(fileChannel);
+        }
+        return strings;
+    }
+
+    private Object[] readNestedArray(FileChannel fileChannel, int len) throws IOException {
+        Object[] arrays = new Object[len];
+        for (int i = 0; i < len; i++) {
+            arrays[i] = readArray(fileChannel);
+        }
+        return arrays;
     }
 
     private Object readMetadataValueOfType(MetadataValueType valueType, FileChannel fileChannel) throws IOException {
@@ -280,9 +299,10 @@ public class GGUF {
     }
 
     private byte readByte(FileChannel fileChannel) throws IOException {
-        int bytesRead = fileChannel.read(BB_1);
-        assert bytesRead == 1;
-        return BB_1.clear().get(0);
+        buffer.clear().limit(Byte.BYTES);
+        int bytesRead = fileChannel.read(buffer);
+        assert bytesRead == Byte.BYTES;
+        return buffer.flip().get();
     }
 
     private boolean readBoolean(FileChannel fileChannel) throws IOException {
@@ -290,21 +310,24 @@ public class GGUF {
     }
 
     private short readShort(FileChannel fileChannel) throws IOException {
-        int bytesRead = fileChannel.read(BB_2);
-        assert bytesRead == 2;
-        return BB_2.clear().getShort(0);
+        buffer.clear().limit(Short.BYTES);
+        int bytesRead = fileChannel.read(buffer);
+        assert bytesRead == Short.BYTES;
+        return buffer.flip().getShort();
     }
 
     private int readInt(FileChannel fileChannel) throws IOException {
-        int bytesRead = fileChannel.read(BB_4);
-        assert bytesRead == 4;
-        return BB_4.clear().getInt(0);
+        buffer.clear().limit(Integer.BYTES);
+        int bytesRead = fileChannel.read(buffer);
+        assert bytesRead == Integer.BYTES;
+        return buffer.flip().getInt();
     }
 
     private long readLong(FileChannel fileChannel) throws IOException {
-        int bytesRead = fileChannel.read(BB_8);
-        assert bytesRead == 8;
-        return BB_8.clear().getLong(0);
+        buffer.clear().limit(Long.BYTES);
+        int bytesRead = fileChannel.read(buffer);
+        assert bytesRead == Long.BYTES;
+        return buffer.flip().getLong();
     }
 
     private float readFloat(FileChannel fileChannel) throws IOException {
@@ -321,11 +344,10 @@ public class GGUF {
     }
 
     public int getAlignment() {
-        if (alignment != 0) {
-            return alignment;
+        if (alignment == 0) {
+            alignment = (int) metadata.getOrDefault("general.alignment", DEFAULT_ALIGNMENT);
+            assert Integer.bitCount(alignment) == 1 : "alignment must be a power of two";
         }
-        alignment = (int) metadata.getOrDefault("general.alignment", DEFAULT_ALIGNMENT);
-        assert Integer.bitCount(alignment) == 1 : "alignment must be a power of two";
         return alignment;
     }
 }

@@ -2,12 +2,11 @@ package example.micronaut.utils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.IntConsumer;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 import example.micronaut.model.Configuration;
 import example.micronaut.model.Llama;
@@ -23,25 +22,30 @@ public class TokenUtils {
 
     public Tokenizer createTokenizer(Map<String, Object> metadata, Vocabulary vocabulary) {
         String[] mergeLines = (String[]) metadata.get("tokenizer.ggml.merges");
-        List<Pair<Integer, Integer>> merges = Arrays.stream(mergeLines)
-                .map(line -> line.split(" "))
-                .map(parts -> new Pair<>(
-                vocabulary.getIndex(parts[0]).orElseThrow(),
-                vocabulary.getIndex(parts[1]).orElseThrow()))
-                .toList();
+        List<Pair<Integer, Integer>> merges = new ArrayList<>(mergeLines.length);
+        for (String line : mergeLines) {
+            String[] parts = line.split(" ");
+            merges.add(new Pair<>(
+                    vocabulary.getIndex(parts[0]).orElseThrow(),
+                    vocabulary.getIndex(parts[1]).orElseThrow()
+            ));
+        }
 
         int allTokens = vocabulary.size();
         int baseTokens = 128000; // assume all tokens after the base ones are special.
-        List<String> specialTokensList = Arrays.stream(vocabulary.tokens(), baseTokens, allTokens).toList();
+
+        String[] allVocabTokens = vocabulary.tokens();
+        List<String> specialTokensList = new ArrayList<>(allTokens - baseTokens);
+        for (int i = baseTokens; i < allTokens; i++) {
+            specialTokensList.add(allVocabTokens[i]);
+        }
 
         assert specialTokensList.stream().allMatch(token -> vocabulary.getIndex(token).isPresent());
 
-        Map<String, Integer> specialTokens;
-        specialTokens = IntStream.range(0, specialTokensList.size())
-                .boxed()
-                .collect(Collectors.toMap(
-                        i -> specialTokensList.get(i),
-                        i -> baseTokens + i));
+        Map<String, Integer> specialTokens = new HashMap<>((int) (specialTokensList.size() / 0.75) + 1);
+        for (int i = 0; i < specialTokensList.size(); i++) {
+            specialTokens.put(specialTokensList.get(i), baseTokens + i);
+        }
 
         return new Tokenizer(vocabulary, merges, ModelLoader.LLAMA_3_PATTERN, specialTokens);
     }
@@ -83,29 +87,30 @@ public class TokenUtils {
             IntConsumer onTokenGenerated) {
         long startNanos = System.nanoTime();
         long startGen = 0;
-        if (maxTokens < 0 || model.configuration().contextLength < maxTokens) {
-            maxTokens = model.configuration().contextLength;
-        }
-        List<Integer> generatedTokens = new ArrayList<>(maxTokens);
+        Tokenizer tokenizer = model.tokenizer();
+        Configuration config = model.configuration();
+        List<Integer> generatedTokens = new ArrayList<>(Math.min(maxTokens, 1024));
         int token = state.latestToken; // BOS?
         int nextToken;
         int promptIndex = 0;
+
+        if (maxTokens < 0 || config.contextLength < maxTokens) {
+            maxTokens = config.contextLength;
+        }
+
         for (int position = startPosition; position < maxTokens; ++position) {
             if (promptIndex < promptTokens.size()) {
-                final int nTokens = Math.min(maxTokens - position,
-                        Math.min(promptTokens.size() - promptIndex, state.batchsize));
+                final int nTokens = Math.min(Math.min(maxTokens - position, promptTokens.size() - promptIndex), state.batchsize);
                 final int[] tokens = new int[nTokens];
+
                 for (int i = 0; i < nTokens; i++) {
                     tokens[i] = promptTokens.get(promptIndex + i);
                     if (echo) {
-                        // log prompt token (different color?)
-                        System.err.print(
-                                Tokenizer.replaceControlCharacters(model.tokenizer().decode(List.of(tokens[i]))));
+                        System.err.print(Tokenizer.replaceControlCharacters(tokenizer.decode(List.of(tokens[i]))));
                     }
                 }
                 if (echo) {
-                    System.out.format("position=%d, promptIdx=%d, promptSize=%d, tokens=%s%n", position, promptIndex,
-                            promptTokens.size(), Arrays.toString(tokens));
+                    System.out.format("position=%d, promptIdx=%d, promptSize=%d, tokens=%s%n", position, promptIndex, promptTokens.size(), Arrays.toString(tokens));
                 }
                 // Only compute logits on the very last batch.
                 boolean computeLogits = promptIndex + nTokens >= promptTokens.size();
